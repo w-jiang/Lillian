@@ -28,7 +28,104 @@ server.post('/api/messages', connector.listen());
 * For samples and documentation, see: https://github.com/Microsoft/BotBuilder-Azure
 * ---------------------------------------------------------------------------------------- */
 
-// Create your bot with a function to receive messages from the user
-var bot = new builder.UniversalBot(connector, function (session) {
-    session.send("You said: %s", session.message.text);
+var bot = new builder.UniversalBot(connector);
+
+var savedAddress;
+server.post('/api/messages', connector.listen());
+
+
+
+bot.dialog('help',  [
+  function (session) {
+    session.beginDialog('askHome');
+  },
+  function (session, results) {
+    if (results.response.toUpperCase() === "YES") {
+      session.endDialog();
+    } else {
+      session.beginDialog('askBreathe');
+    }
+  }
+]);
+
+bot.dialog('askHome', [
+    function (session) {
+      session.send("Do you want me to make sure you get home safely?");
+      setTimeout(() => {
+        session.send("I'll check in on you after a set period of time and if you don't reply to me within a few minutes, I'll message someone to physically check in on you");
+      }, 2000);
+      setTimeout(() => {
+        builder.Prompts.text(session, "Would you like that?");
+      }, 3500);
+    },
+    function (session, results) {
+      if (results.response.toUpperCase() === "YES")
+          session.beginDialog('getHome');
+      else
+          session.endDialogWithResult(results);
+    }
+]);
+
+bot.dialog('getHome', [
+  function (session) {
+    session.dialogData.alarm = {};
+    builder.Prompts.time(session, "When do you want me to check back in with you? (e.g.,'in 5 minutes')");
+  },
+  function (session, results) {
+    session.sent("test1");
+    if (results.response) {
+        session.dialogData.time = builder.EntityRecognizer.resolveTime([results.response]);
+        session.send("s%", builder.EntityRecognizer.resolveTime([results.response]));
+        session.dialogData.name = "Are you home?";
+    }
+    session.sent("test");
+    // Return alarm to caller  
+    if (session.dialogData.name && session.dialogData.time) {
+        session.endDialogWithResult({ 
+            response: { name: session.dialogData.name, time: session.dialogData.time } 
+        }); 
+    } else {
+        session.endDialogWithResult({
+            resumed: builder.ResumeReason.notCompleted
+        });
+    }
+  }
+]);
+
+bot.dialog('askBreathe', [
+  function (session) {
+    session.send("hi");
+  }
+]);
+
+bot.dialog('getBreathe', [
+  function (session) {
+    session.send("hi");
+  }
+]);
+
+// root dialog
+bot.dialog('/', function(session, args) {
+
+  savedAddress = session.message.address;
+  if (session.message.text.toUpperCase() === "HI" ||
+      session.message.text.toUpperCase() === "HELLO" ||
+      session.message.text.toUpperCase() === "SUP" ||
+      session.message.text.toUpperCase() === "HEY") {
+          session.send("Hi there! What can I do for you?");
+  }
+  else if (session.message.text.toUpperCase().includes("HOME")) {
+      session.beginDialog('getHome');
+  }
+  else if (session.message.text.toUpperCase().includes("BREATHE")) {
+      session.beginDialog('getBreathe');
+  }
+  else if (session.message.text.toUpperCase().includes("HELP")) {
+      session.beginDialog('help');
+  } else {
+      session.send("Sorry, I'm still learning and I don't know what you mean by that...");
+      setTimeout(() => {
+        session.send("Try typing 'help' for a list of things that I can do! :D");
+      }, 2000);
+  }
 });
